@@ -21,12 +21,15 @@ Perusahaan "CloudTech" sedang bermigrasi ke arsitektur *Microservices & Serverle
    - Buat *Backup Plan* yang berjalan secara harian untuk mencadangkan data instance RDS dan tabel DynamoDB.
 6. **Amazon EventBridge (Monitoring & Automation)**:
    - Buat sebuah *Rule* di EventBridge untuk memantau status eksekusi Step Functions yang gagal (*Failed*), dan rutekan targetnya agar memicu (trigger) peringatan ke Amazon SNS.
+7. **AWS Elastic Beanstalk (Admin Panel)**:
+   - Deploy aplikasi Flask (Python) yang ada pada folder `beanstalk_admin/` menggunakan **AWS Elastic Beanstalk** (koneksikan ke VPC yang sama jika diperlukan/diminta pada studi kasus).
 
 ### Direktori Kerja Peserta
 - `/amplify_frontend` -> Source code front-end (HTML/JS) siap commit ke Github. Jangan ubah struktur jika tidak diperlukan, pastikan berjalan lancar di Amplify.
 - `/cloudformation` -> Tempat Anda menuliskan template IaC (`infrastructure.yml`).
 - `/lambda` -> Letakkan *source code* Python Lambda Anda di sini. Cukup siapkan `.py` (dan `requirements.txt` jika **benar-benar** butuh library eksternal, `boto3` sudah *built-in*).
 - `/step_functions` -> Tempat *file* `registration_workflow.asl.json` yang akan mendefinisikan *State Machine*.
+- `/beanstalk_admin` -> Source code aplikasi Admin (Flask/Python) untuk di-deploy ke AWS Elastic Beanstalk. File utama sudah disiapkan dengan nama `application.py`.
 
 ### Petunjuk Pengerjaan
 1. Silakan mulai pengerjaan dari menyiapkan infrastruktur *networking* di file CloudFormation.
