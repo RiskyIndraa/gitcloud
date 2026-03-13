@@ -17,6 +17,10 @@ Perusahaan "CloudTech" sedang bermigrasi ke arsitektur *Microservices & Serverle
    - Memanggil Lambda untuk simpan DB RDS.
    - Memanggil Lambda (yang telah Anda buat pada nomor 3) untuk mencatat log ke DynamoDB.
    - Mengirim notifikasi email via Amazon SNS.
+5. **AWS Backup (Disaster Recovery)**:
+   - Buat *Backup Plan* yang berjalan secara harian untuk mencadangkan data instance RDS dan tabel DynamoDB.
+6. **Amazon EventBridge (Monitoring & Automation)**:
+   - Buat sebuah *Rule* di EventBridge untuk memantau status eksekusi Step Functions yang gagal (*Failed*), dan rutekan targetnya agar memicu (trigger) peringatan ke Amazon SNS.
 
 ### Direktori Kerja Peserta
 - `/amplify_frontend` -> Source code front-end (HTML/JS) siap commit ke Github. Jangan ubah struktur jika tidak diperlukan, pastikan berjalan lancar di Amplify.
