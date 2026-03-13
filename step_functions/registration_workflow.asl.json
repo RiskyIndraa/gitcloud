@@ -1,0 +1,41 @@
+{
+  "Comment": "Workflow pendaftaran user baru menggunakan Step Functions",
+  "StartAt": "SaveUserToRDS",
+  "States": {
+    "SaveUserToRDS": {
+      "Type": "Task",
+      "Resource": "arn:aws:lambda:us-east-1:123456789012:function:lks_post",
+      "Next": "LogActivityToDynamoDB",
+      "Catch": [
+        {
+          "ErrorEquals": ["States.ALL"],
+          "Next": "FailState"
+        }
+      ]
+    },
+    "LogActivityToDynamoDB": {
+      "Type": "Task",
+      "Resource": "arn:aws:lambda:us-east-1:123456789012:function:lks_log_dynamo",
+      "Next": "SendNotification",
+      "Catch": [
+        {
+          "ErrorEquals": ["States.ALL"],
+          "Next": "FailState"
+        }
+      ]
+    },
+    "SendNotification": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::sns:publish",
+      "Parameters": {
+        "TopicArn": "arn:aws:sns:us-east-1:123456789012:LKS-Registration-Alerts",
+        "Message": "User baru berhasil mendaftar dan log telah disimpan."
+      },
+      "End": true
+    },
+    "FailState": {
+      "Type": "Fail",
+      "Cause": "Terjadi kesalahan dalam proses pendaftaran user."
+    }
+  }
+}

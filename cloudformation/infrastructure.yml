@@ -1,0 +1,48 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: 'LKS Cloud Computing Infrastructure with VPC, RDS, DynamoDB, EFS, S3, and AWS Backup'
+
+Resources:
+  # 1. DynamoDB Table (Baru dari kisi-kisi)
+  UserActivityLogsTable:
+    Type: AWS::DynamoDB::Table
+    Properties: 
+      TableName: LKS-UserLogs
+      AttributeDefinitions: 
+        - AttributeName: log_id
+          AttributeType: S
+        - AttributeName: timestamp
+          AttributeType: S
+      KeySchema: 
+        - AttributeName: log_id
+          KeyType: HASH
+        - AttributeName: timestamp
+          KeyType: RANGE
+      ProvisionedThroughput: 
+        ReadCapacityUnits: 5
+        WriteCapacityUnits: 5
+
+  # 2. SNS Topic (Integrasi Aplikasi)
+  RegistrationNotificationTopic:
+    Type: AWS::SNS::Topic
+    Properties: 
+      TopicName: LKS-Registration-Alerts
+
+  # 3. AWS Backup Vault & Plan (Baru dari kisi-kisi)
+  LKSBackupVault:
+    Type: AWS::Backup::BackupVault
+    Properties:
+      BackupVaultName: lks-backup-vault
+
+  LKSBackupPlan:
+    Type: AWS::Backup::BackupPlan
+    Properties:
+      BackupPlan:
+        BackupPlanName: lks-daily-backup
+        BackupPlanRule:
+          - RuleName: DailyBackupRule
+            TargetBackupVault: !Ref LKSBackupVault
+            ScheduleExpression: "cron(0 12 * * ? *)"
+            Lifecycle:
+              DeleteAfterDays: 30
+
+  # (Bayangkan di bawah ini ada VPC, RDS, EFS, dan Security Group seperti tahun sebelumnya)
