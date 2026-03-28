@@ -73,6 +73,6 @@ Lakukan konfigurasi berikut secara manual melalui AWS Console:
 4.  **Resilience:** Notifikasi email masuk saat sistem sengaja dibuat gagal.
 
 **Waktu Pengerjaan:** 5 Jam.
-**Selamat Mendaftar LKS, Riski!**
+**Selamat Mengerjakan LKS, Riski!**
 
 ---
