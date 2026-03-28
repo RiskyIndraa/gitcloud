@@ -3,50 +3,81 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>LKS 2024 - Pendaftaran Peserta (Amplify)</title>
+    <title>LKS 2026 - CloudTech Portal</title>
     <style>
-        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f4f7f6; padding: 20px; }
-        .container { max-width: 600px; margin: 0 auto; background: white; padding: 30px; border-radius: 8px; box-shadow: 0 4px 8px rgba(0,0,0,0.1); }
-        h2 { text-align: center; color: #333; }
-        .form-group { margin-bottom: 15px; }
-        label { display: block; margin-bottom: 5px; color: #666; }
-        input[type="text"], input[type="email"] { width: 100%; padding: 10px; border: 1px solid #ccc; border-radius: 4px; box-sizing: border-box; }
-        button { width: 100%; padding: 10px; background-color: #007bff; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 16px; }
-        button:hover { background-color: #0056b3; }
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f0f2f5; padding: 20px; display: flex; justify-content: center; }
+        .container { max-width: 500px; width: 100%; background: white; padding: 40px; border-radius: 12px; box-shadow: 0 10px 25px rgba(0,0,0,0.1); }
+        h2 { text-align: center; color: #1a73e8; margin-bottom: 30px; }
+        .form-group { margin-bottom: 20px; }
+        label { display: block; margin-bottom: 8px; color: #5f6368; font-weight: 600; }
+        input[type="text"], input[type="email"], input[type="file"] { 
+            width: 100%; padding: 12px; border: 2px solid #e0e0e0; border-radius: 8px; box-sizing: border-box; transition: border-color 0.3s;
+        }
+        input:focus { border-color: #1a73e8; outline: none; }
+        button { 
+            width: 100%; padding: 14px; background-color: #1a73e8; color: white; border: none; border-radius: 8px; 
+            cursor: pointer; font-size: 16px; font-weight: bold; transition: background 0.3s;
+        }
+        button:hover { background-color: #1557b0; }
+        #status { margin-top: 20px; text-align: center; font-weight: bold; }
+        .success { color: #28a745; }
+        .error { color: #dc3545; }
     </style>
 </head>
 <body>
 
 <div class="container">
-    <h2>Form Pendaftaran Baru</h2>
+    <h2>Registrasi CloudTech</h2>
     <form id="registForm">
         <div class="form-group">
             <label>Nama Lengkap</label>
-            <input type="text" id="name" required>
+            <input type="text" id="name" placeholder="Contoh: Riski Indra" required>
         </div>
         <div class="form-group">
             <label>Email</label>
-            <input type="email" id="email" required>
+            <input type="email" id="email" placeholder="email@contoh.com" required>
         </div>
-        <button type="submit">Daftar Sekarang</button>
+        <div class="form-group">
+            <label>Foto Profil (Maks 1MB)</label>
+            <input type="file" id="photo" accept="image/*" required>
+        </div>
+        <button type="submit" id="submitBtn">Daftar Sekarang</button>
     </form>
     <p id="status"></p>
 </div>
 
 <script>
+    // GANTI URL INI BESOK SETELAH API GATEWAY SELESAI
     const API_URL = "https://your-api-gateway-url.execute-api.us-east-1.amazonaws.com/prod/users";
+
+    // Fungsi mengubah File ke Base64
+    const toBase64 = file => new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.readAsDataURL(file);
+        reader.onload = () => resolve(reader.result.split(',')[1]); // Ambil datanya saja
+        reader.onerror = error => reject(error);
+    });
 
     document.getElementById('registForm').addEventListener('submit', async (e) => {
         e.preventDefault();
-        const data = {
-            name: document.getElementById('name').value,
-            email: document.getElementById('email').value
-        };
+        const submitBtn = document.getElementById('submitBtn');
+        const statusMsg = document.getElementById('status');
+        const photoFile = document.getElementById('photo').files[0];
 
-        document.getElementById('status').innerText = "Mengirim...";
+        submitBtn.disabled = true;
+        statusMsg.innerText = "⏳ Sedang memproses data & foto...";
+        statusMsg.className = "";
 
         try {
-            // Ini akan memicu API Gateway yang kemudian memicu Step Functions
+            const photoBase64 = await toBase64(photoFile);
+            
+            const data = {
+                name: document.getElementById('name').value,
+                email: document.getElementById('email').value,
+                photo: photoBase64,
+                fileName: photoFile.name
+            };
+
             const response = await fetch(API_URL, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -54,12 +85,19 @@
             });
 
             if(response.ok) {
-                document.getElementById('status').innerText = "Berhasil Mendaftar!";
+                statusMsg.innerText = "✅ Berhasil! Data & Foto telah tersimpan.";
+                statusMsg.className = "success";
+                document.getElementById('registForm').reset();
             } else {
-                document.getElementById('status').innerText = "Gagal mendaftar.";
+                statusMsg.innerText = "❌ Gagal mendaftar (Cek API Gateway).";
+                statusMsg.className = "error";
             }
         } catch(err) {
-            document.getElementById('status').innerText = "Error jaringan!";
+            console.error(err);
+            statusMsg.innerText = "❌ Error jaringan atau file terlalu besar!";
+            statusMsg.className = "error";
+        } finally {
+            submitBtn.disabled = false;
         }
     });
 </script>

@@ -1,42 +1,78 @@
-# Soal Lomba Kompetensi Siswa (LKS) - Cloud Computing
-## Modul: Modern Web Architectures & Serverless
+
+---
+
+# Soal Lomba Kompetensi Siswa (LKS) - Cloud Computing (v3.0)
+## Modul: Enterprise Infrastructure Automation & Serverless Architecture
 
 ### Deskripsi Tugas
-Perusahaan "CloudTech" sedang bermigrasi ke arsitektur *Microservices & Serverless*. Anda ditugaskan sebagai Cloud Engineer untuk membangun infrastruktur di AWS dan memastikan aplikasi *front-end* ter-deploy dengan baik. Aplikasi ini akan menerima registrasi pengguna baru, yang prosesnya diatur menggunakan AWS Step Functions.
+Perusahaan "CloudTech" memerlukan infrastruktur yang *robust*, *scalable*, dan sepenuhnya terdokumentasi dalam kode (IaC). Tugas Anda adalah membangun ekosistem pendaftaran user yang melibatkan penyimpanan aset, database relasional, log aktivitas, hingga panel admin yang memiliki ketersediaan tinggi (High Availability).
 
 ### Tujuan Utama yang harus diselesaikan:
-1. **Frontend & CI/CD**: Deploy folder `amplify_frontend/` menggunakan AWS Amplify. Hubungkan repository Github lokal/remote Anda ke AWS Amplify untuk di-*hosting* otomatis.
-2. **Infrastructure as Code (IaC)**: Selesaikan kode `infrastructure.yml` di folder `cloudformation/` untuk membangun:
-   - VPC, Subnet, Route Table.
-   - Amazon RDS (MariaDB) untuk database utama.
-   - Amazon DynamoDB dengan nama tabel `LKS-UserLogs`.
-3. **Fungsi Serverless**: Lengkapi script Python pada folder `lambda/` untuk:
-   - Menyimpan *log* ke DynamoDB (menggunakan library `boto3`). 
-   - (Catatan: Anda cukup menyesuaikan nama tabel dan *field* log-nya. Library `boto3` tidak perlu diinstal dalam `.zip` karena sudah *pre-installed* di AWS Lambda).
-4. **AWS Step Functions (Workflow)**: Selesaikan definisi JSON di folder `step_functions/` untuk mengatur *workflow* registrasi:
-   - Memanggil Lambda untuk simpan DB RDS.
-   - Memanggil Lambda (yang telah Anda buat pada nomor 3) untuk mencatat log ke DynamoDB.
-   - Mengirim notifikasi email via Amazon SNS.
-5. **AWS Backup (Disaster Recovery)**:
-   - Buat *Backup Plan* yang berjalan secara harian untuk mencadangkan data instance RDS dan tabel DynamoDB.
-6. **Amazon EventBridge (Monitoring & Automation)**:
-   - Buat sebuah *Rule* di EventBridge untuk memantau status eksekusi Step Functions yang gagal (*Failed*), dan rutekan targetnya agar memicu (trigger) peringatan ke Amazon SNS.
-7. **AWS Elastic Beanstalk (Admin Panel)**:
-   - Deploy aplikasi Flask (Python) yang ada pada folder `beanstalk_admin/` menggunakan **AWS Elastic Beanstalk** (koneksikan ke VPC yang sama jika diperlukan/diminta pada studi kasus).
 
-### Direktori Kerja Peserta
-- `/amplify_frontend` -> Source code front-end (HTML/JS) siap commit ke Github. Jangan ubah struktur jika tidak diperlukan, pastikan berjalan lancar di Amplify.
-- `/cloudformation` -> Tempat Anda menuliskan template IaC (`infrastructure.yml`).
-- `/lambda` -> Letakkan *source code* Python Lambda Anda di sini. Cukup siapkan `.py` (dan `requirements.txt` jika **benar-benar** butuh library eksternal, `boto3` sudah *built-in*).
-- `/step_functions` -> Tempat *file* `registration_workflow.asl.json` yang akan mendefinisikan *State Machine*.
-- `/beanstalk_admin` -> Source code aplikasi Admin (Flask/Python) untuk di-deploy ke AWS Elastic Beanstalk. File utama sudah disiapkan dengan nama `application.py`.
+#### 1. Infrastructure as Code (CloudFormation - Wajib)
+Selesaikan template `infrastructure.yml` untuk membangun hampir seluruh sumber daya berikut secara otomatis:
+* **Networking (Multi-AZ):** * VPC dengan 2 Public Subnets dan 2 Private Subnets di dua Availability Zone berbeda.
+    * Internet Gateway dan Route Tables.
+    * **NAT Instance:** Deploy 1 EC2 Instance (Amazon Linux 2023) di Public Subnet sebagai NAT Instance untuk memberikan akses internet ke Private Subnet (Konfigurasikan *Source/Dest Check* secara manual/script).
+* **Database & Storage:**
+    * **Amazon RDS (MariaDB):** Deploy di Private Subnets (Multi-AZ Deployment).
+    * **Amazon DynamoDB:** Tabel `LKS-UserLogs` (Hash Key: `log_id`, Range Key: `timestamp`).
+    * **Amazon EFS:** File system untuk *shared storage* Admin Panel, lengkap dengan *Mount Targets* di tiap AZ.
+* **Storage & Messaging:**
+    * **Amazon S3:** Bucket `cloudtech-assets-[nama-peserta]` dengan **Lifecycle Policy** (Move to Glacier after 30 days).
+    * **Amazon SNS:** Topic `LKS-Registration-Alerts`.
+* **Backup & Security:**
+    * **AWS Backup:** Vault dan Plan harian untuk mencadangkan RDS, DynamoDB, dan EFS.
+    * **Security Groups:** Aturan minimalis untuk akses antar layanan (Web, App, DB, EFS).
 
-### Petunjuk Pengerjaan
-1. Silakan mulai pengerjaan dari menyiapkan infrastruktur *networking* di file CloudFormation.
-2. Buat repository Git, dan mulailah proses integrasi dengan AWS Amplify.
-3. Kerjakan bagian logika Lambda dan pastikan Anda mengerti cara membaca datanya.
-4. Buat dan *test* State Machine di layar konsol AWS dengan meng-copy kode JSON Anda.
-5. Anda bebas melakukan iterasi (*trial & error*). 
+#### 2. Compute & High Availability (Elastic Beanstalk)
+Deploy aplikasi Admin Panel dari folder `beanstalk_admin/`:
+* **Platform:** Amazon Linux 2023 (Python 3.11/3.12).
+* **Scaling:** Konfigurasikan **Application Load Balancer (ALB)** dan **Auto Scaling Group** (Min: 2, Max: 4) di dalam VPC.
+* **EFS Integration:** Pastikan instance Beanstalk melakukan *mount* ke EFS yang dibuat di tahap 1 agar data admin tersinkronisasi.
+* **Environment Properties:** Masukkan endpoint RDS, nama database, user, dan password sebagai variabel lingkungan.
 
-**Waktu Pengerjaan:** 4 Jam
-**Selamat Mengerjakan!**
+#### 3. Serverless Logic (API Gateway, Lambda, Step Functions)
+* **API Gateway:** Buat REST API dengan resource `/users` (Method POST).
+* **AWS Lambda:** * `lks_post`: Simpan data user ke RDS dan upload foto profil (Base64) ke S3.
+    * `lks_log_dynamo`: Catat aktivitas ke DynamoDB.
+* **AWS Step Functions:** State Machine `LKS-Registration-Workflow` untuk mengatur urutan: `SaveToRDS&S3` -> `LogToDynamo` -> `SendSNSSuccess`.
+
+#### 4. Monitoring & Proactive Alerts
+* **CloudWatch Dashboard:** Buat dashboard visual untuk memantau:
+    * CPU Utilization dari EC2 (Beanstalk Instances).
+    * Database Connections dari RDS.
+* **CloudWatch Alarm:** Kirim notifikasi ke SNS Topic jika CPU Utilization Beanstalk > 70%.
+* **Amazon EventBridge:** Deteksi status `FAILED` pada Step Functions dan kirimkan alert ke SNS secara otomatis.
+
+#### 5. Frontend & CI/CD
+* **AWS Amplify:** Hubungkan ke repository GitHub Anda.
+* **Feature:** Update form agar bisa menerima input **Nama, Email, dan Foto Profil** (dikirim sebagai Base64 JSON ke API Gateway).
+
+---
+
+### Detail Penamaan Resource (Wajib Sama):
+| Resource | Nama / Nama Fisik |
+| :--- | :--- |
+| **DynamoDB Table** | `LKS-UserLogs` |
+| **SNS Topic** | `LKS-Registration-Alerts` |
+| **Backup Vault** | `lks-backup-vault` |
+| **S3 Bucket** | `cloudtech-assets-[nama-peserta]` |
+| **Step Function** | `LKS-Registration-Workflow` |
+| **RDS DB Name** | `cloudtech_db` |
+
+---
+
+### Kriteria Kelulusan (Definition of Done):
+1.  Frontend Amplify berhasil mengirim data dan foto profil.
+2.  Step Function berjalan hijau (Succeeded).
+3.  Admin Panel (Beanstalk) menampilkan data dari RDS dan bisa diakses via Load Balancer URL.
+4.  Email notifikasi masuk ke inbox saat pendaftaran sukses atau Step Function sengaja dibuat gagal.
+5.  Konfigurasi EFS terbukti aktif (shared file antar instance Beanstalk).
+
+---
+
+**Waktu Pengerjaan:** 5 Jam.
+**Selamat Mengerjakan, Riski!**
+
+---
