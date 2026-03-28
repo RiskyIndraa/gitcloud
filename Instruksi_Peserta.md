@@ -1,78 +1,78 @@
+Siap, Riski. Kita buat instruksi **CloudWatch** menjadi bagian manual agar kamu bisa lebih memahami alurnya lewat klik-klik di konsol, sementara infrastruktur berat lainnya tetap kita "pukul" pakai **CloudFormation** (IaC).
+
+Berikut adalah revisi final **Soal LKS Cloud Computing (v4.0)**. Soal ini sudah sangat mendalam, mencakup seluruh kisi-kisi, dan menggunakan **NAT Instance** sesuai preferensimu.
 
 ---
 
-# Soal Lomba Kompetensi Siswa (LKS) - Cloud Computing (v3.0)
-## Modul: Enterprise Infrastructure Automation & Serverless Architecture
+# Soal Lomba Kompetensi Siswa (LKS) - Cloud Computing (v4.0)
+## Modul: Enterprise Infrastructure Automation & Hybrid-Cloud Storage
 
 ### Deskripsi Tugas
-Perusahaan "CloudTech" memerlukan infrastruktur yang *robust*, *scalable*, dan sepenuhnya terdokumentasi dalam kode (IaC). Tugas Anda adalah membangun ekosistem pendaftaran user yang melibatkan penyimpanan aset, database relasional, log aktivitas, hingga panel admin yang memiliki ketersediaan tinggi (High Availability).
+Perusahaan "CloudTech" sedang melakukan transformasi besar-besaran. Anda diminta untuk membangun infrastruktur yang otomatis namun tetap memiliki skalabilitas tinggi. Fokus utama adalah pada **High Availability**, **Shared Storage**, dan **Security**. Seluruh resource infrastruktur dasar wajib dibangun menggunakan **CloudFormation**, kecuali bagian pemantauan (*monitoring*) yang akan dikonfigurasi secara manual.
 
 ### Tujuan Utama yang harus diselesaikan:
 
-#### 1. Infrastructure as Code (CloudFormation - Wajib)
-Selesaikan template `infrastructure.yml` untuk membangun hampir seluruh sumber daya berikut secara otomatis:
-* **Networking (Multi-AZ):** * VPC dengan 2 Public Subnets dan 2 Private Subnets di dua Availability Zone berbeda.
-    * Internet Gateway dan Route Tables.
-    * **NAT Instance:** Deploy 1 EC2 Instance (Amazon Linux 2023) di Public Subnet sebagai NAT Instance untuk memberikan akses internet ke Private Subnet (Konfigurasikan *Source/Dest Check* secara manual/script).
+#### 1. Networking & IaC (CloudFormation - Wajib)
+Selesaikan template `infrastructure.yml` untuk membangun sumber daya berikut:
+* **Networking (Multi-AZ):**
+    * VPC dengan **2 Public Subnets** dan **2 Private Subnets** di dua Availability Zone berbeda.
+    * Internet Gateway, Route Tables, dan Security Groups.
+    * **NAT Instance:** Deploy 1 EC2 Instance (Amazon Linux 2023) di Public Subnet. Konfigurasikan agar instance ini berfungsi sebagai gateway internet bagi resource di Private Subnet.
 * **Database & Storage:**
-    * **Amazon RDS (MariaDB):** Deploy di Private Subnets (Multi-AZ Deployment).
-    * **Amazon DynamoDB:** Tabel `LKS-UserLogs` (Hash Key: `log_id`, Range Key: `timestamp`).
-    * **Amazon EFS:** File system untuk *shared storage* Admin Panel, lengkap dengan *Mount Targets* di tiap AZ.
+    * **Amazon RDS (MariaDB):** Deploy di Private Subnets dengan fitur Multi-AZ.
+    * **Amazon DynamoDB:** Tabel `LKS-UserLogs` (Partition Key: `log_id`, Sort Key: `timestamp`).
+    * **Amazon EFS:** Shared file system untuk Admin Panel, lengkap dengan *Mount Targets* di setiap AZ.
 * **Storage & Messaging:**
-    * **Amazon S3:** Bucket `cloudtech-assets-[nama-peserta]` dengan **Lifecycle Policy** (Move to Glacier after 30 days).
+    * **Amazon S3:** Bucket `cloudtech-assets-[nama-peserta]` lengkap dengan **Lifecycle Policy** (Otomatis pindah ke **Glacier** setelah 30 hari).
     * **Amazon SNS:** Topic `LKS-Registration-Alerts`.
-* **Backup & Security:**
-    * **AWS Backup:** Vault dan Plan harian untuk mencadangkan RDS, DynamoDB, dan EFS.
-    * **Security Groups:** Aturan minimalis untuk akses antar layanan (Web, App, DB, EFS).
+* **Disaster Recovery:**
+    * **AWS Backup:** Backup Vault (`lks-backup-vault`) dan Backup Plan harian untuk mencadangkan RDS, DynamoDB, dan EFS.
 
 #### 2. Compute & High Availability (Elastic Beanstalk)
 Deploy aplikasi Admin Panel dari folder `beanstalk_admin/`:
-* **Platform:** Amazon Linux 2023 (Python 3.11/3.12).
-* **Scaling:** Konfigurasikan **Application Load Balancer (ALB)** dan **Auto Scaling Group** (Min: 2, Max: 4) di dalam VPC.
-* **EFS Integration:** Pastikan instance Beanstalk melakukan *mount* ke EFS yang dibuat di tahap 1 agar data admin tersinkronisasi.
-* **Environment Properties:** Masukkan endpoint RDS, nama database, user, dan password sebagai variabel lingkungan.
+* **Environment:** Gunakan **Application Load Balancer (ALB)**.
+* **Scaling:** Aktifkan **Auto Scaling Group** (Min: 2, Max: 4) berdasarkan penggunaan CPU.
+* **Storage Integration:** Pastikan aplikasi Flask di Beanstalk dapat membaca/menulis ke **Amazon EFS** (Konfigurasi via `.ebextensions`).
+* **OS:** Menggunakan **Amazon Linux 2023**.
 
-#### 3. Serverless Logic (API Gateway, Lambda, Step Functions)
-* **API Gateway:** Buat REST API dengan resource `/users` (Method POST).
-* **AWS Lambda:** * `lks_post`: Simpan data user ke RDS dan upload foto profil (Base64) ke S3.
-    * `lks_log_dynamo`: Catat aktivitas ke DynamoDB.
-* **AWS Step Functions:** State Machine `LKS-Registration-Workflow` untuk mengatur urutan: `SaveToRDS&S3` -> `LogToDynamo` -> `SendSNSSuccess`.
+#### 3. Serverless Workflow (API & Logic)
+* **API Gateway:** Buat REST API `/users` (POST) yang terintegrasi dengan Step Functions.
+* **Lambda Functions:**
+    * `lks_post`: Menyimpan data ke MariaDB dan mengunggah foto profil (Base64) ke S3.
+    * `lks_log_dynamo`: Mencatat metadata pendaftaran ke DynamoDB.
+* **AWS Step Functions:** State Machine `LKS-Registration-Workflow` (Flow: Save RDS/S3 -> Log DynamoDB -> SNS Notify).
 
-#### 4. Monitoring & Proactive Alerts
-* **CloudWatch Dashboard:** Buat dashboard visual untuk memantau:
-    * CPU Utilization dari EC2 (Beanstalk Instances).
-    * Database Connections dari RDS.
-* **CloudWatch Alarm:** Kirim notifikasi ke SNS Topic jika CPU Utilization Beanstalk > 70%.
-* **Amazon EventBridge:** Deteksi status `FAILED` pada Step Functions dan kirimkan alert ke SNS secara otomatis.
+#### 4. Manual Configuration (Monitoring & Automation)
+Lakukan konfigurasi berikut secara manual melalui AWS Console:
+* **CloudWatch Dashboard:** Buat dashboard untuk memantau **CPU EC2** dan **RDS Connections**.
+* **CloudWatch Alarm:** Buat alarm yang mengirim email via SNS jika CPU Beanstalk > 70%.
+* **Amazon EventBridge:** Buat rule untuk mendeteksi status `FAILED` pada Step Functions dan mengirimkan alert ke SNS.
 
 #### 5. Frontend & CI/CD
-* **AWS Amplify:** Hubungkan ke repository GitHub Anda.
-* **Feature:** Update form agar bisa menerima input **Nama, Email, dan Foto Profil** (dikirim sebagai Base64 JSON ke API Gateway).
+* **AWS Amplify:** Hubungkan GitHub repository.
+* **Fitur:** Update form agar dapat mengirimkan **Nama**, **Email**, dan **File Foto** (convert ke Base64) ke API Gateway.
 
 ---
 
-### Detail Penamaan Resource (Wajib Sama):
-| Resource | Nama / Nama Fisik |
+### Daftar Penamaan Resource (Case Sensitive):
+| Resource | Nama Wajib |
 | :--- | :--- |
-| **DynamoDB Table** | `LKS-UserLogs` |
-| **SNS Topic** | `LKS-Registration-Alerts` |
-| **Backup Vault** | `lks-backup-vault` |
-| **S3 Bucket** | `cloudtech-assets-[nama-peserta]` |
-| **Step Function** | `LKS-Registration-Workflow` |
-| **RDS DB Name** | `cloudtech_db` |
+| DynamoDB Table | `LKS-UserLogs` |
+| SNS Topic | `LKS-Registration-Alerts` |
+| Backup Vault | `lks-backup-vault` |
+| S3 Bucket | `cloudtech-assets-[nama-peserta]` |
+| Step Function | `LKS-Registration-Workflow` |
+| RDS Database | `cloudtech_db` |
 
 ---
 
-### Kriteria Kelulusan (Definition of Done):
-1.  Frontend Amplify berhasil mengirim data dan foto profil.
-2.  Step Function berjalan hijau (Succeeded).
-3.  Admin Panel (Beanstalk) menampilkan data dari RDS dan bisa diakses via Load Balancer URL.
-4.  Email notifikasi masuk ke inbox saat pendaftaran sukses atau Step Function sengaja dibuat gagal.
-5.  Konfigurasi EFS terbukti aktif (shared file antar instance Beanstalk).
-
----
+### Kriteria Penilaian Utama:
+1.  **Automation:** Template CloudFormation berjalan tanpa error (Status: `CREATE_COMPLETE`).
+2.  **Scalability:** Admin Panel dapat diakses via ALB URL dan memiliki minimal 2 instance berjalan.
+3.  **End-to-End:** Pendaftaran dari web berhasil masuk ke RDS, fotonya masuk S3, dan log-nya masuk DynamoDB.
+4.  **Resilience:** Notifikasi email masuk saat sistem sengaja dibuat gagal.
 
 **Waktu Pengerjaan:** 5 Jam.
-**Selamat Mengerjakan, Riski!**
+**Selamat Mendaftar LKS, Riski!**
 
 ---
